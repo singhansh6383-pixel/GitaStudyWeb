@@ -1,0 +1,490 @@
+<!doctype html>
+<html lang="hi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<title>Gita Study</title>
+
+<style>
+:root{
+--bg:#f8f5ff;--card:#fff;--ink:#211b2b;--muted:#6f687b;
+--accent:#6d28d9;--soft:#eee7ff;--line:#e2dcef;--good:#0f766e
+}
+*{box-sizing:border-box}
+body{
+margin:0;font-family:system-ui,-apple-system,"Noto Sans Devanagari",sans-serif;
+background:var(--bg);color:var(--ink)
+}
+body.dark{
+--bg:#111016;--card:#1d1a23;--ink:#f3eef9;--muted:#bcb3c8;
+--accent:#b78cff;--soft:#302840;--line:#393241;--good:#58c7bb
+}
+header{
+position:sticky;top:0;z-index:5;
+background:var(--bg);border-bottom:1px solid var(--line);
+padding:14px 16px
+}
+.brand{
+display:flex;align-items:center;justify-content:space-between
+}
+.brand h1{font-size:21px;margin:0;color:var(--accent)}
+.actions{display:flex;gap:8px}
+.btn{
+border:1px solid var(--line);background:var(--card);color:var(--ink);
+border-radius:14px;padding:10px 13px;font-size:14px
+}
+main{max-width:850px;margin:auto;padding:18px 14px 60px}
+.hero{
+background:linear-gradient(145deg,var(--soft),var(--card));
+border:1px solid var(--line);border-radius:26px;
+padding:24px 20px;margin-bottom:16px
+}
+.hero h2{font-size:34px;margin:0 0 8px}
+.hero p{color:var(--muted);line-height:1.7;margin:8px 0}
+.badge{
+display:inline-block;padding:6px 10px;background:var(--soft);
+border-radius:999px;color:var(--accent);font-size:12px;margin:3px
+}
+input{
+width:100%;padding:15px 16px;border:1px solid var(--line);
+border-radius:16px;background:var(--card);color:var(--ink);
+font-size:16px;outline:none
+}
+.section-title{font-size:22px;margin:24px 4px 12px}
+.grid{
+display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px
+}
+.chapter{
+background:var(--card);border:1px solid var(--line);
+border-radius:18px;padding:16px;text-align:left;color:var(--ink)
+}
+.chapter b{display:block;color:var(--accent);margin-bottom:5px}
+.chapter small{color:var(--muted);line-height:1.5}
+.panel{
+background:var(--card);border:1px solid var(--line);
+border-radius:20px;padding:16px;margin:12px 0
+}
+.row{
+display:flex;justify-content:space-between;align-items:center;gap:10px
+}
+.verseNo{color:var(--accent);font-weight:800}
+.sanskrit{
+font-family:"Noto Serif Devanagari",serif;
+font-size:22px;line-height:1.9;margin:14px 0
+}
+.trans{font-style:italic;color:var(--muted);line-height:1.7}
+.translation{line-height:1.7;margin-top:12px}
+.note{
+background:var(--soft);padding:12px;border-radius:14px;
+line-height:1.7;margin-top:12px
+}
+.star{
+font-size:22px;border:0;background:none;color:var(--accent)
+}
+.hidden{display:none}
+.back{margin-bottom:12px}
+.progress{
+height:8px;background:var(--soft);border-radius:99px;overflow:hidden
+}
+.progress>i{
+display:block;height:100%;background:var(--accent);width:0
+}
+.meta{color:var(--muted);font-size:13px}
+.footer{
+text-align:center;color:var(--muted);padding:30px 0;font-size:13px
+}
+@media(min-width:650px){
+.grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+.hero{padding:30px}
+}
+</style>
+</head>
+
+<body>
+
+<header>
+<div class="brand">
+<h1>ॐ GITA STUDY</h1>
+<div class="actions">
+<button class="btn" id="theme">☾</button>
+<button class="btn" id="home">Top</button>
+</div>
+</div>
+</header>
+
+<main id="app">
+
+<div class="hero">
+<h2>श्रीमद्भगवद्गीता</h2>
+
+<span class="badge">PDF-based</span>
+<span class="badge">700 source entries</span>
+<span class="badge">Offline</span>
+
+<p>
+यह Version 2 आपके दिए हुए
+<b>“Bhagvat Geeta (English).pdf”</b>
+को primary source मानकर बनाया गया है।
+श्लोक, transliteration और English source translation PDF से लिए गए हैं।
+Hindi/Hinglish study notes supplementary हैं।
+</p>
+
+<input id="search" placeholder="🔎 श्लोक, अध्याय या विषय खोजें…">
+</div>
+
+<div id="homeView"></div>
+<div id="chapterView" class="hidden"></div>
+<div id="verseView" class="hidden"></div>
+
+<div class="footer">
+हरि ॐ तत्सत • Offline Gita Study
+</div>
+
+</main>
+
+<script>
+
+let DATA=null;
+let currentChapter=null;
+
+const fav=JSON.parse(localStorage.getItem('gitaFav')||'[]');
+const read=JSON.parse(localStorage.getItem('gitaRead')||'[]');
+
+const $=id=>document.getElementById(id);
+
+const esc=s=>(s||'').replace(
+/[&<>"']/g,
+m=>({
+'&':'&amp;',
+'<':'&lt;',
+'>':'&gt;',
+'"':'&quot;',
+"'":'&#39;'
+}[m])
+);
+
+fetch('gita_data.json')
+.then(r=>r.json())
+.then(d=>{
+DATA=d;
+renderHome();
+});
+
+function renderHome(filter=''){
+
+$('chapterView').classList.add('hidden');
+$('verseView').classList.add('hidden');
+$('homeView').classList.remove('hidden');
+
+let q=filter.trim().toLowerCase();
+
+let cards=DATA.chapters.map(c=>{
+
+let vs=DATA.verses.filter(v=>v.chapter===c.number);
+
+let match=
+!q ||
+c.title.toLowerCase().includes(q) ||
+c.summary_hi.includes(q) ||
+vs.some(v=>
+(v.sanskrit_raw+
+v.transliteration+
+v.source_translation)
+.toLowerCase()
+.includes(q)
+);
+
+if(!match)return '';
+
+return `
+<button class="chapter" onclick="openChapter(${c.number})">
+
+<b>${c.number}. ${esc(c.title)}</b>
+
+<small>
+${vs.length} source entries<br>
+${esc(c.summary_hi)}
+</small>
+
+</button>
+`;
+
+}).join('');
+
+$('homeView').innerHTML=`
+
+<div class="panel">
+
+<div class="row">
+
+<b>पढ़ाई की प्रगति</b>
+
+<span class="meta">
+${read.length}/${DATA.verses.length}
+</span>
+
+</div>
+
+<div class="progress">
+
+<i style="width:${
+Math.round(read.length/DATA.verses.length*100)
+}%"></i>
+
+</div>
+
+</div>
+
+<h3 class="section-title">
+📚 18 अध्याय
+</h3>
+
+<div class="grid">
+
+${cards||`
+<div class="panel">
+कुछ नहीं मिला। Search बदलकर देखें।
+</div>
+`}
+
+</div>
+`;
+}
+
+function openChapter(n){
+
+currentChapter=n;
+
+$('homeView').classList.add('hidden');
+$('verseView').classList.add('hidden');
+$('chapterView').classList.remove('hidden');
+
+let c=DATA.chapters.find(x=>x.number===n);
+
+let vs=DATA.verses.filter(v=>v.chapter===n);
+
+$('chapterView').innerHTML=`
+
+<button class="btn back" onclick="renderHome()">
+← वापस
+</button>
+
+<div class="hero">
+
+<h2>अध्याय ${n}</h2>
+
+<p>
+<b>${esc(c.title)}</b>
+</p>
+
+<p>
+${esc(c.summary_hi)}
+</p>
+
+</div>
+
+<div class="panel">
+
+<input
+id="vsearch"
+placeholder="इस अध्याय के श्लोक खोजें…"
+oninput="filterVerses(this.value)"
+>
+
+</div>
+
+<div id="verseList">
+${verseCards(vs)}
+</div>
+`;
+}
+
+function verseCards(vs){
+
+return vs.map(v=>`
+
+<button
+class="chapter"
+style="width:100%;margin-bottom:9px"
+onclick="openVerse('${v.id}')"
+>
+
+<div class="row">
+
+<span class="verseNo">
+श्लोक ${v.verse}
+</span>
+
+<span>
+${fav.includes(v.id)?'★':'☆'}
+</span>
+
+</div>
+
+<small>
+${esc((v.source_translation||'').slice(0,190))}
+</small>
+
+</button>
+
+`).join('');
+}
+
+function filterVerses(q){
+
+let x=q.toLowerCase();
+
+let vs=DATA.verses.filter(v=>
+v.chapter===currentChapter &&
+(
+(v.source_translation||'').toLowerCase().includes(x) ||
+(v.sanskrit_raw||'').toLowerCase().includes(x) ||
+(v.transliteration||'').toLowerCase().includes(x) ||
+String(v.verse).includes(x)
+)
+);
+
+$('verseList').innerHTML=verseCards(vs);
+}
+
+function openVerse(id){
+
+let v=DATA.verses.find(x=>x.id===id);
+
+if(!v)return;
+
+if(!read.includes(id)){
+read.push(id);
+localStorage.setItem(
+'gitaRead',
+JSON.stringify(read)
+);
+}
+
+$('homeView').classList.add('hidden');
+$('chapterView').classList.add('hidden');
+$('verseView').classList.remove('hidden');
+
+let isFav=fav.includes(id);
+
+$('verseView').innerHTML=`
+
+<button
+class="btn back"
+onclick="openChapter(${v.chapter})"
+>
+← अध्याय ${v.chapter}
+</button>
+
+<div class="panel">
+
+<div class="row">
+
+<span class="verseNo">
+अध्याय ${v.chapter} • श्लोक ${v.verse}
+</span>
+
+<button
+class="star"
+onclick="toggleFav('${id}')"
+>
+${isFav?'★':'☆'}
+</button>
+
+</div>
+
+<div class="sanskrit">
+${esc(v.sanskrit_raw)}
+</div>
+
+<div class="trans">
+${esc(v.transliteration)}
+</div>
+
+<div class="translation">
+
+<b>📖 PDF source translation:</b>
+<br>
+
+${esc(v.source_translation)}
+
+</div>
+
+<div class="note">
+
+<b>🇮🇳 सरल हिन्दी अध्ययन-नोट</b>
+<br>
+
+${esc(v.hindi_note)}
+
+</div>
+
+<div class="note">
+
+<b>🗣️ Hinglish study note</b>
+<br>
+
+${esc(v.hinglish_note)}
+
+</div>
+
+<div
+class="meta"
+style="margin-top:14px"
+>
+
+Source:
+Bhagvat Geeta (English).pdf
+
+</div>
+
+</div>
+`;
+}
+
+function toggleFav(id){
+
+let i=fav.indexOf(id);
+
+if(i>=0)
+fav.splice(i,1);
+else
+fav.push(id);
+
+localStorage.setItem(
+'gitaFav',
+JSON.stringify(fav)
+);
+
+openVerse(id);
+}
+
+$('search').addEventListener(
+'input',
+e=>renderHome(e.target.value)
+);
+
+$('theme').onclick=()=>{
+
+document.body.classList.toggle('dark');
+
+localStorage.setItem(
+'gitaDark',
+document.body.classList.contains('dark')
+);
+
+};
+
+if(localStorage.getItem('gitaDark')==='true')
+document.body.classList.add('dark');
+
+$('home').onclick=()=>
+window.scrollTo({
+top:0,
+behavior:'smooth'
+});
+
+</script>
+
+</body>
+</html>
